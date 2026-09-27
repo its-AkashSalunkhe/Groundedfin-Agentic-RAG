@@ -1,1 +1,2 @@
 This is actually a genuine constraint worth documenting in your README later — "live" on the free tier means "within a 12-hour-to-30-day window," not literally real-time. That's a normal trade-off in real systems, and being upfront about it in an interview is a good sign, not a weakness.
+
