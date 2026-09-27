@@ -1,10 +1,11 @@
-import os, json
-from typing import TypedDict
+import os
+from typing import TypedDict, List, Tuple, Optional
 from dotenv import load_dotenv
 from groq import Groq
 import chromadb
 from chromadb.utils import embedding_functions
 import requests
+from langgraph.graph import StateGraph, START, END
 
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -14,6 +15,16 @@ ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-Mi
 chroma_client = chromadb.PersistentClient(path="chroma_db")
 collection = chroma_client.get_collection("fraud_knowledge", embedding_function=ef)
 
+
+class AgentState(TypedDict):
+    question: str
+    label: str
+    kb_results: List[Tuple[str, dict]]
+    news_results: List[Tuple[str, str, str]]
+    answer: str
+
+
+# ---------- LLM calls ----------
 
 def classify_query(question):
     prompt = f"""Classify this question into exactly one word: STATIC, LIVE, BOTH, or DIRECT.
@@ -32,13 +43,6 @@ Answer with one word only."""
     return resp.choices[0].message.content.strip().upper()
 
 
-def search_knowledge_base(question, n=3):
-    results = collection.query(query_texts=[question], n_results=n)
-    docs = results["documents"][0]
-    metas = results["metadatas"][0]
-    return list(zip(docs, metas))
-
-
 def extract_search_keywords(question):
     prompt = f"""Extract the core topic from this question as 2-3 keywords for a news search, space-separated, no commas, no quotes.
 Do not include words like "recent", "latest", "India", "news", or question words.
@@ -53,37 +57,65 @@ Keywords:"""
     return resp.choices[0].message.content.strip().strip('"').replace(",", "")
 
 
-def _gnews_query(q, max_results):
+def _gnews_query(q, max_results, country=None):
     url = "https://gnews.io/api/v4/search"
-    params = {"q": q, "lang": "en", "country": "in", "max": max_results, "sortby": "publishedAt", "apikey": gnews_key}
+    params = {"q": q, "lang": "en", "max": max_results, "sortby": "publishedAt", "apikey": gnews_key}
+    if country:
+        params["country"] = country
     r = requests.get(url, params=params, timeout=10)
     return r.json().get("articles", [])
 
 
-
-def search_live_news(question, max_results=5):
+def fetch_live_news(question, max_results=5):
     keywords = extract_search_keywords(question)
-    print(f"[debug] news search keywords: {keywords}")
-    articles = _gnews_query(keywords, max_results)
-
+    articles = _gnews_query(keywords, max_results, country="in")
     if not articles:
-        # fallback 1: drop the country filter, in case it's over-narrowing
-        url = "https://gnews.io/api/v4/search"
-        params = {"q": keywords, "lang": "en", "max": max_results, "sortby": "publishedAt", "apikey": gnews_key}
-        r = requests.get(url, params=params, timeout=10)
-        articles = r.json().get("articles", [])
-        print(f"[debug] fallback (no country filter) results: {len(articles)}")
-
+        articles = _gnews_query(keywords, max_results)
     if not articles:
-        # fallback 2: just the first keyword, broadest possible search
         broad_term = keywords.split()[0] if keywords else question.split()[0]
         articles = _gnews_query(broad_term, max_results)
-        print(f"[debug] fallback (broad term '{broad_term}') results: {len(articles)}")
-
     return [(a["title"], a["publishedAt"], a["url"]) for a in articles]
 
 
-def generate_answer(question, kb_results=None, news_results=None, mode="grounded"):
+def fetch_kb(question, n=3):
+    results = collection.query(query_texts=[question], n_results=n)
+    return list(zip(results["documents"][0], results["metadatas"][0]))
+
+
+def call_llm(prompt, temperature=0.2):
+    resp = groq_client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature
+    )
+    return resp.choices[0].message.content
+
+
+# ---------- graph nodes ----------
+
+def classify_node(state):
+    return {"label": classify_query(state["question"])}
+
+
+def kb_node(state):
+    return {"kb_results": fetch_kb(state["question"])}
+
+
+def news_node(state):
+    return {"news_results": fetch_live_news(state["question"])}
+
+
+def direct_node(state):
+    prompt = f"""You are GroundedFin, a helpful assistant focused on fraud and scam awareness in India. Respond naturally and briefly. If it's a greeting or small talk, just reply normally.
+
+Message: {state['question']}
+Answer:"""
+    return {"answer": call_llm(prompt)}
+
+
+def generate_node(state):
+    kb_results = state.get("kb_results", [])
+    news_results = state.get("news_results", [])
     context = ""
     if kb_results:
         context += "From RBI fraud awareness material:\n"
@@ -94,49 +126,69 @@ def generate_answer(question, kb_results=None, news_results=None, mode="grounded
         for title, date, url in news_results:
             context += f"- {title} ({date})\n"
 
-    if mode == "direct":
-        prompt = f"""You are GroundedFin, a helpful assistant focused on fraud and scam awareness in India. Respond naturally and briefly. If it's a greeting or small talk, just reply normally.
+    if not context:
+        return {"answer": ("I couldn't find reliable information on this in the fraud knowledge base or recent "
+                            "news results. For the latest guidance, check RBI's official channels or report at "
+                            "cybercrime.gov.in / helpline 1930.")}
 
-Message: {question}
-Answer:"""
-    elif context:
-        prompt = f"""Answer the question using only the context below. Cite the source (booklet section or news article) for each claim. If the context doesn't fully cover the question, say so honestly rather than guessing.
+    prompt = f"""Answer the question using only the context below. Cite the source in plain parentheses like (Source: Times of India, 26 Sep 2026), not special brackets. If the context doesn't fully cover the question, say so honestly rather than guessing.
 
 Context:
 {context}
 
-Question: {question}
+Question: {state['question']}
 Answer:"""
-    else:
-        return ("I couldn't find reliable information on this in the fraud knowledge base or recent news results. "
-                "For the latest guidance, check RBI's official channels or report at cybercrime.gov.in / helpline 1930.")
+    return {"answer": call_llm(prompt)}
 
-    resp = groq_client.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2
-    )
-    return resp.choices[0].message.content
+
+# ---------- routing ----------
+
+def route_after_classify(state):
+    label = state["label"]
+    if label == "DIRECT":
+        return "direct"
+    elif label == "STATIC":
+        return "kb"
+    elif label == "LIVE":
+        return "news"
+    else:
+        return "kb_then_news"
+
+
+def route_after_kb(state):
+    return "news" if state["label"] == "BOTH" else "generate"
+
+
+# ---------- build graph ----------
+
+graph = StateGraph(AgentState)
+graph.add_node("classify", classify_node)
+graph.add_node("kb", kb_node)
+graph.add_node("news", news_node)
+graph.add_node("direct", direct_node)
+graph.add_node("generate", generate_node)
+
+graph.add_edge(START, "classify")
+graph.add_conditional_edges("classify", route_after_classify, {
+    "direct": "direct",
+    "kb": "kb",
+    "news": "news",
+    "kb_then_news": "kb",
+})
+graph.add_conditional_edges("kb", route_after_kb, {"news": "news", "generate": "generate"})
+graph.add_edge("news", "generate")
+graph.add_edge("direct", END)
+graph.add_edge("generate", END)
+
+app = graph.compile()
 
 
 def ask(question):
-    label = classify_query(question)
-    print(f"[classified as: {label}]")
-
-    if label == "DIRECT":
-        return generate_answer(question, mode="direct")
-    elif label == "STATIC":
-        kb = search_knowledge_base(question)
-        return generate_answer(question, kb_results=kb)
-    elif label == "LIVE":
-        news = search_live_news(question)
-        print(f"[debug] news results: {news}")
-        return generate_answer(question, news_results=news)
-    else:
-        kb = search_knowledge_base(question)
-        news = search_live_news(question)
-        print(f"[debug] news results: {news}")
-        return generate_answer(question, kb_results=kb, news_results=news)
+    result = app.invoke({
+        "question": question, "label": "", "kb_results": [], "news_results": [], "answer": ""
+    })
+    print(f"[classified as: {result['label']}]")
+    return result["answer"]
 
 
 if __name__ == "__main__":
