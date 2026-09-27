@@ -1,0 +1,8 @@
+Date : Oct 15, 2012
+RBI cautions Public Not to respond to Phishing Mail sent in its Name
+It has come to the notice of the Reserve Bank of India that an email has been sent in its name from mail id: Reserve Bank Of India (no-reply@rbi.com) and signed by RBI, Security Team offering a 'new online security protection' called "Netsecured” to “reduce fraud and theft in various banking system…(and)… to enable all customer's online banking in all Indian Banks to get protected and Secured.”
+The Reserve Bank cautions members of public that it has not developed any such software; nor has it sent any such mail asking online banking customers to update their account details to secure their online accounts. In fact, the Reserve Bank does not have any mail id with extension @rbi.com
+Members of public receiving such mails should not open the attachment and/or try to download the attachment on their computers. This is a phishing mail and accessing the mail in any manner could result in identity theft.
+Alpana Killawala
+      Chief General Manager
+Press Release : 2012-2013/634

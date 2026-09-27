@@ -1,0 +1,14 @@
+Date : Feb 08, 2018
+RBI Cautions about Fake Websites in its Name
+It has come to the notice of the Reserve Bank of India that a fake website of the Reserve Bank of India has been created with the URL 
+www.indiareserveban.org
+ by some unknown person(s). The layout of the fake website is similar to the original RBI website. The home page of the fake website also contains a provision for “Bank verification with online account holders” which appears to have been created with a fraudulent intent of obtaining personal and confidential banking details of customers of banks.
+The Reserve Bank of India clarifies that as India’s central bank, it does not hold any accounts for individuals and never asks for personal information such as bank account details, passwords, etc. The Reserve Bank cautions members of public that responding online on such websites could result in compromising crucial personal information that may be misused to cause financial and other loss to them.
+Further, members of public are also cautioned about existence of websites such as 
+www.rbi.org
+, 
+www.rbi.in
+ etc. These URLs may appear similar to the website of RBI. However, these websites have no affiliation with the Reserve Bank of India. Members of public are advised to be cautious while accessing or when providing any information on such sites.
+Jose J. Kattoor
+    Chief General Manager
+Press Release: 2017-2018/2166
