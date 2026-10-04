@@ -7,6 +7,8 @@ from chromadb.utils import embedding_functions
 import requests
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
+import re
+
 
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -31,6 +33,9 @@ class AgentState(TypedDict):
     chat_history: Annotated[List[Tuple[str, str]], operator.add]
     answer: str
     user_id: str
+    blocked: bool
+    grounded: bool
+    ground_attempts: int
 
 
 # ---------- LLM calls ----------
@@ -59,11 +64,12 @@ Self-contained question:"""
 
 
 def classify_query(question):
-    prompt = f"""Classify this question into exactly one word: STATIC, LIVE, BOTH, or DIRECT.
+    prompt = f"""Classify this question into exactly one word: STATIC, LIVE, BOTH, DIRECT, or OUT_OF_SCOPE.
 STATIC - asking what a scam is, how it works, general precautions (answerable from a fraud awareness booklet)
 LIVE - asking about recent news, current events, what's happening now
 BOTH - needs both general knowledge and recent news
 DIRECT - greeting, thanks, or something needing no lookup at all
+OUT_OF_SCOPE - anything unrelated to fraud, scams, or financial safety (recipes, general trivia, coding help, unrelated small talk that isn't a greeting)
 
 Question: {question}
 Answer with one word only."""
@@ -137,7 +143,49 @@ def save_long_term_memory(question, answer, user_id):
     )
 
 
+
+INJECTION_PATTERNS = [
+    r"ignore (all |the )?(previous|prior|above) (instructions|prompts?)",
+    r"disregard (all |the )?(previous|prior|above)",
+    r"you are now",
+    r"reveal (your |the )?(system prompt|instructions)",
+    r"what (are|is) your (system prompt|instructions)",
+    r"pretend (you|to) (are|be)",
+    r"jailbreak",
+    r"developer mode",
+    r"do anything now",
+    r"forget (your |all )?(previous )?(instructions|rules)",
+]
+_INJECTION_COMPILED = [re.compile(p, re.IGNORECASE) for p in INJECTION_PATTERNS]
+
+
+def check_injection(text):
+    for pattern in _INJECTION_COMPILED:
+        if pattern.search(text):
+            return True
+    return False
+
+
+def redact_pii(text):
+    text = re.sub(r'\b(?:\d[ -]?){13,19}\b', '[CARD NUMBER REDACTED] ', text)
+    text = re.sub(r'\b\d{12}\b', '[ID NUMBER REDACTED]', text)
+    text = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '[EMAIL REDACTED]', text)
+    text = re.sub(r'(\+91[\-\s]?)?\b[6-9]\d{9}\b', '[PHONE REDACTED]', text)
+    text = re.sub(r'\b(OTP|PIN|CVV)\s*(is|:)?\s*\d{3,6}\b', r'\1 [REDACTED]', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s{2,}', ' ', text).strip()
+    return text
+
+
+
+
+
 # ---------- graph nodes ----------
+
+def input_guardrail_node(state):
+    if check_injection(state["question"]):
+        return {"blocked": True, "answer": "I can't follow instructions embedded in a question like that. Feel free to ask me anything about fraud and scam awareness directly."}
+    return {"blocked": False}
+
 
 def contextualize_node(state):
     sq = contextualize_question(state["question"], state.get("chat_history", []))
@@ -152,6 +200,10 @@ def recall_node(state):
 def classify_node(state):
     return {"label": classify_query(state["standalone_question"])}
 
+
+def out_of_scope_node(state):
+    answer = "I'm built specifically for fraud and scam awareness in India. I can't help with that, but ask me anything about phishing, vishing, card fraud, or similar topics."
+    return {"answer": answer, "chat_history": [(state["question"], answer)]}
 
 def kb_node(state):
     attempt = state.get("kb_attempts", 0)
@@ -185,12 +237,10 @@ Answer:"""
     return {"answer": answer, "chat_history": [(state["question"], answer)]}
 
 
-def generate_node(state):
+def build_context(state):
     kb_results = state.get("kb_results", [])
     news_results = state.get("news_results", [])
     long_term_context = state.get("long_term_context", "")
-    has_real_content = bool(kb_results or news_results)
-
     context = ""
     if long_term_context:
         context += f"What you remember about this user from past conversations:\n{long_term_context}\n\n"
@@ -202,25 +252,82 @@ def generate_node(state):
         context += "\nRecent news:\n"
         for title, date, url in news_results:
             context += f"- {title} ({date})\n"
+    return context
+
+
+def generate_node(state):
+    kb_results = state.get("kb_results", [])
+    news_results = state.get("news_results", [])
+    has_real_content = bool(kb_results or news_results)
+    attempt = state.get("ground_attempts", 0)
 
     if not has_real_content:
-        answer = ("I couldn't find reliable information on this in the fraud knowledge base or recent news "
-                  "results. For the latest guidance, check RBI's official channels or report at "
-                  "cybercrime.gov.in / helpline 1930.")
-    else:
-        prompt = f"""Answer the question using only the context below. Cite the source in plain parentheses like (Source: Times of India, 26 Sep 2026), not special brackets. Use the "what you remember" section only to personalize tone, never as a factual source. Never describe something as recent unless its source date is within the last 30 days. If the context doesn't fully cover the question, say so honestly.
+        return {"answer": ("I couldn't find reliable information on this in the fraud knowledge base or recent "
+                            "news results. For the latest guidance, check RBI's official channels or report at "
+                            "cybercrime.gov.in / helpline 1930."),
+                "grounded": True}
+
+    context = build_context(state)
+    strictness = "" if attempt == 0 else (
+        "\n\nIMPORTANT: Your previous answer included claims not present in the context. "
+        "This time, state ONLY facts that are explicitly present in the context below. "
+        "Do not add examples, numbers, or details you are inferring or recalling from general knowledge."
+    )
+    prompt = f"""Answer the question using only the context below. Cite the source in plain parentheses like (Source: Times of India, 26 Sep 2026), not special brackets. Use the "what you remember" section only to personalize tone, never as a factual source. Never describe something as recent unless its source date is within the last 30 days. If the context doesn't fully cover the question, say so honestly.{strictness}
 
 Context:
 {context}
 
 Question: {state['standalone_question']}
 Answer:"""
-        answer = call_llm(prompt)
+    answer = call_llm(prompt)
+    return {"answer": answer}
 
+
+def groundedness_check_node(state):
+    kb_results = state.get("kb_results", [])
+    news_results = state.get("news_results", [])
+    has_real_content = bool(kb_results or news_results)
+    attempt = state.get("ground_attempts", 0)
+
+    if not has_real_content:
+        return {"grounded": True, "ground_attempts": attempt}
+
+    context = build_context(state)
+    prompt = f"""You are checking an AI-generated answer for accuracy. Does the answer below state ONLY facts that are explicitly present in the context? Answer with just YES or NO.
+
+Context:
+{context}
+
+Answer to check:
+{state['answer']}
+
+Is every claim in the answer supported by the context? YES or NO:"""
+    verdict = call_llm(prompt, temperature=0).strip().upper()
+    grounded = verdict.startswith("YES")
+    print(f"[debug] groundedness attempt={attempt} verdict={verdict} grounded={grounded}")
+    return {"grounded": grounded, "ground_attempts": attempt + 1}
+
+
+def finalize_node(state):
+    answer = state["answer"]
+    kb_results = state.get("kb_results", [])
+    news_results = state.get("news_results", [])
+    has_real_content = bool(kb_results or news_results)
+
+    if has_real_content and not state["grounded"]:
+        answer += " [Note: some details in this answer could not be fully verified against the source material.]"
+
+    answer = redact_pii(answer)
     if has_real_content:
-        save_long_term_memory(state["question"], answer, state["user_id"])
+        save_long_term_memory(redact_pii(state["question"]), answer, state["user_id"])
     return {"answer": answer, "chat_history": [(state["question"], answer)]}
 
+
+def route_after_ground(state):
+    if state["grounded"] or state["ground_attempts"] >= 2:
+        return "finalize"
+    return "regenerate"
 
 # ---------- routing ----------
 
@@ -228,6 +335,8 @@ def route_after_classify(state):
     label = state["label"]
     if label == "DIRECT":
         return "direct"
+    elif label == "OUT_OF_SCOPE":
+        return "out_of_scope"
     elif label == "STATIC":
         return "kb"
     elif label == "LIVE":
@@ -248,19 +357,28 @@ def route_after_kb(state):
 
 graph = StateGraph(AgentState)
 graph.add_node("contextualize", contextualize_node)
+graph.add_node("input_guardrail", input_guardrail_node)
 graph.add_node("recall", recall_node)
 graph.add_node("classify", classify_node)
 graph.add_node("kb", kb_node)
 graph.add_node("kb_rewrite", kb_rewrite_node)
 graph.add_node("news", news_node)
 graph.add_node("direct", direct_node)
+graph.add_node("out_of_scope", out_of_scope_node)
 graph.add_node("generate", generate_node)
+graph.add_node("ground_check", groundedness_check_node)
+graph.add_node("finalize", finalize_node)
 
-graph.add_edge(START, "contextualize")
+graph.add_edge(START, "input_guardrail")
+graph.add_conditional_edges("input_guardrail", lambda s: "blocked" if s["blocked"] else "continue", {
+    "blocked": END,
+    "continue": "contextualize",
+})
 graph.add_edge("contextualize", "recall")
 graph.add_edge("recall", "classify")
 graph.add_conditional_edges("classify", route_after_classify, {
     "direct": "direct",
+    "out_of_scope": "out_of_scope",
     "kb": "kb",
     "news": "news",
     "kb_then_news": "kb",
@@ -273,7 +391,13 @@ graph.add_conditional_edges("kb", route_after_kb, {
 graph.add_edge("kb_rewrite", "kb")
 graph.add_edge("news", "generate")
 graph.add_edge("direct", END)
-graph.add_edge("generate", END)
+graph.add_edge("out_of_scope", END)
+graph.add_edge("generate", "ground_check")
+graph.add_conditional_edges("ground_check", route_after_ground, {
+    "finalize": "finalize",
+    "regenerate": "generate",
+})
+graph.add_edge("finalize", END)
 
 app = graph.compile(checkpointer=InMemorySaver())
 
@@ -283,6 +407,8 @@ def ask(question, user_id="default_user", thread_id="default_thread"):
     result = app.invoke({
         "question": question,
         "user_id": user_id,
+        "grounded": False,
+        "ground_attempts": 0,
         "kb_attempts": 0,
         "kb_relevant": False,
         "query_for_kb": "",
