@@ -1,0 +1,30 @@
+[
+  {
+    "thread_id": "eval_mt_1",
+    "turns": [
+      {"question": "What is phishing?", "note": "establish topic"},
+      {"question": "How is that different from vishing?", "note": "'that' should resolve to phishing"}
+    ]
+  },
+  {
+    "thread_id": "eval_mt_2",
+    "turns": [
+      {"question": "Any recent UPI fraud cases in India?", "note": "establish topic"},
+      {"question": "Any updates on that?", "note": "'that' should resolve to UPI fraud"}
+    ]
+  },
+  {
+    "thread_id": "eval_mt_3",
+    "turns": [
+      {"question": "What is a money mule?", "note": "establish topic"},
+      {"question": "What should I do if someone asks me to be one?", "note": "implicit reference, no 'that'"}
+    ]
+  },
+  {
+    "thread_id": "eval_mt_4",
+    "turns": [
+      {"question": "What is digital arrest?", "note": "establish topic"},
+      {"question": "Is it common recently?", "note": "'it' should resolve to digital arrest, should trigger LIVE or BOTH"}
+    ]
+  }
+]
