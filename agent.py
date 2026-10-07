@@ -54,22 +54,26 @@ def contextualize_question(question, chat_history):
         return question
     history_text = "\n".join(f"Q: {q}\nA: {a}" for q, a in chat_history[-3:])
     prompt = f"""Given this recent conversation and a new question, rewrite the new question to be fully self-contained if it depends on prior context. If it's already self-contained, return it unchanged.
+Output ONLY the rewritten question text. Do not include any label, prefix, or explanation.
 
 Recent conversation:
 {history_text}
 
 New question: {question}
 Self-contained question:"""
-    return call_llm(prompt, temperature=0).strip()
+    result = call_llm(prompt, temperature=0).strip()
+    if result.lower().startswith("self-contained question:"):
+        result = result.split(":", 1)[1].strip()
+    return result
 
 
 def classify_query(question):
     prompt = f"""Classify this question into exactly one word: STATIC, LIVE, BOTH, DIRECT, or OUT_OF_SCOPE.
-STATIC - asking what a scam is, how it works, general precautions (answerable from a fraud awareness booklet)
+STATIC - asking what a fraud or scam type is, how it works, or general precautions — even if the specific term might not be in the knowledge base (the system will search and can fall back to live news)
 LIVE - asking about recent news, current events, what's happening now
 BOTH - needs both general knowledge and recent news
 DIRECT - greeting, thanks, or something needing no lookup at all
-OUT_OF_SCOPE - anything unrelated to fraud, scams, or financial safety (recipes, general trivia, coding help, unrelated small talk that isn't a greeting)
+OUT_OF_SCOPE - anything clearly unrelated to fraud, scams, or financial safety (recipes, trivia, coding help, unrelated small talk) — not a fraud-related question just because the term is newer or uncommon
 
 Question: {question}
 Answer with one word only."""
@@ -143,7 +147,6 @@ def save_long_term_memory(question, answer, user_id):
     )
 
 
-
 INJECTION_PATTERNS = [
     r"ignore (all |the )?(previous|prior|above) (instructions|prompts?)",
     r"disregard (all |the )?(previous|prior|above)",
@@ -176,9 +179,6 @@ def redact_pii(text):
     return text
 
 
-
-
-
 # ---------- graph nodes ----------
 
 def input_guardrail_node(state):
@@ -204,6 +204,7 @@ def classify_node(state):
 def out_of_scope_node(state):
     answer = "I'm built specifically for fraud and scam awareness in India. I can't help with that, but ask me anything about phishing, vishing, card fraud, or similar topics."
     return {"answer": answer, "chat_history": [(state["question"], answer)]}
+
 
 def kb_node(state):
     attempt = state.get("kb_attempts", 0)
@@ -237,12 +238,12 @@ Answer:"""
     return {"answer": answer, "chat_history": [(state["question"], answer)]}
 
 
-def build_context(state):
+def build_context(state, include_memory=True):
     kb_results = state.get("kb_results", [])
     news_results = state.get("news_results", [])
     long_term_context = state.get("long_term_context", "")
     context = ""
-    if long_term_context:
+    if include_memory and long_term_context:
         context += f"What you remember about this user from past conversations:\n{long_term_context}\n\n"
     if kb_results:
         context += "From RBI fraud awareness material:\n"
@@ -262,16 +263,18 @@ def generate_node(state):
     attempt = state.get("ground_attempts", 0)
 
     if not has_real_content:
-        return {"answer": ("I couldn't find reliable information on this in the fraud knowledge base or recent "
-                            "news results. For the latest guidance, check RBI's official channels or report at "
-                            "cybercrime.gov.in / helpline 1930."),
-                "grounded": True}
+        return {"answer": ("I couldn't find reliable information on this in the fraud knowledge base or recent news "
+                            "results. For the latest guidance, check RBI's official channels or report at "
+                            "cybercrime.gov.in / helpline 1930.")}
 
-    context = build_context(state)
+    # on the stricter retry, drop memory from context entirely -- the model can't misuse
+    # what it can no longer see, and this matches exactly what groundedness checks against
+    context = build_context(state, include_memory=(attempt == 0))
     strictness = "" if attempt == 0 else (
         "\n\nIMPORTANT: Your previous answer included claims not present in the context. "
         "This time, state ONLY facts that are explicitly present in the context below. "
-        "Do not add examples, numbers, or details you are inferring or recalling from general knowledge."
+        "Do not add examples, numbers, or details you are inferring or recalling from general knowledge. "
+        "If recent news doesn't cover the question, say so plainly."
     )
     prompt = f"""Answer the question using only the context below. Cite the source in plain parentheses like (Source: Times of India, 26 Sep 2026), not special brackets. Use the "what you remember" section only to personalize tone, never as a factual source. Never describe something as recent unless its source date is within the last 30 days. If the context doesn't fully cover the question, say so honestly.{strictness}
 
@@ -293,8 +296,12 @@ def groundedness_check_node(state):
     if not has_real_content:
         return {"grounded": True, "ground_attempts": attempt}
 
-    context = build_context(state)
-    prompt = f"""You are checking an AI-generated answer for accuracy. Does the answer below state ONLY facts that are explicitly present in the context? Answer with just YES or NO.
+    context = build_context(state, include_memory=False)
+    prompt = f"""You are checking an AI-generated answer for accuracy.
+
+Rules:
+- If the ENTIRE answer simply states that no relevant information is available, or expresses inability to answer due to missing context, with no additional specific facts, dates, or figures beyond that -- this is automatically GROUNDED. Answer YES.
+- If the answer includes ANY specific fact, number, date, or named detail, that detail must be explicitly present in the context below. If even one such detail is not explicitly present in the context, answer NO.
 
 Context:
 {context}
@@ -302,7 +309,7 @@ Context:
 Answer to check:
 {state['answer']}
 
-Is every claim in the answer supported by the context? YES or NO:"""
+Is this answer grounded according to the rules above? YES or NO:"""
     verdict = call_llm(prompt, temperature=0).strip().upper()
     grounded = verdict.startswith("YES")
     print(f"[debug] groundedness attempt={attempt} verdict={verdict} grounded={grounded}")
@@ -329,6 +336,7 @@ def route_after_ground(state):
         return "finalize"
     return "regenerate"
 
+
 # ---------- routing ----------
 
 def route_after_classify(state):
@@ -349,7 +357,7 @@ def route_after_kb(state):
     if state["kb_relevant"]:
         return "news" if state["label"] == "BOTH" else "generate"
     if state["kb_attempts"] >= 2:
-        return "news" if state["label"] == "BOTH" else "generate"
+        return "news"  # KB found nothing after retries -- check live news before giving up
     return "rewrite"
 
 
