@@ -117,7 +117,7 @@ def fetch_live_news(question, max_results=5):
     return [(a["title"], a["publishedAt"], a["url"]) for a in articles]
 
 
-def fetch_kb_with_distance(query, n=3):
+def fetch_kb_with_distance(query, n=5):
     results = collection.query(query_texts=[query], n_results=n)
     docs = results["documents"][0]
     metas = results["metadatas"][0]
@@ -212,12 +212,14 @@ def kb_node(state):
     results, best_distance = fetch_kb_with_distance(query)
     relevant = best_distance < 0.6
     print(f"[debug] kb attempt={attempt} best_distance={best_distance:.3f} relevant={relevant}")
+    if relevant:
+        for doc, meta in results:
+            print(f"[debug]   retrieved: {doc[:60]!r} (source: {meta.get('source')})")
     return {
         "kb_results": results if relevant else [],
         "kb_relevant": relevant,
         "kb_attempts": attempt + 1,
     }
-
 
 def kb_rewrite_node(state):
     new_query = rewrite_kb_query(state["standalone_question"])

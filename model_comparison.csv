@@ -1,0 +1,65 @@
+id,model,grounded,time_sec,answer_len,answer
+S1,openai/gpt-oss-20b,True,0.93,496,"Phishing is a cyber‑fraud technique in which fraudsters create fake websites or send deceptive messages that look like legitimate ones—such as a bank’s site or an official email—to trick people into clicking on links and entering sensitive information (BE(A)WARE booklet). These fake sites or emails often mimic the appearance of real institutions, and users may not notice the altered URL or sender address, leading them to disclose credentials or personal data (RBI press release pr_27405.txt)."
+S1,openai/gpt-oss-120b,True,1.11,526,"Phishing is a fraud technique in which criminals set up a counterfeit (third‑party) website that mimics a legitimate site—such as a bank, e‑commerce portal or search engine—and then distribute links to that fake site through SMS, social‑media, email, instant‑messenger, etc. When unsuspecting users click the link without verifying the full URL, they are led to the bogus site and are prompted to enter sensitive information such as login credentials, which the fraudsters then capture ([BE(A)WARE booklet] 1. Phishing links)."
+S3,openai/gpt-oss-20b,True,0.93,399,"SIM swap fraud is when fraudsters gain access to or duplicate a victim’s SIM card (or electronic‑SIM) for the mobile number linked to the victim’s bank account. They then use the OTP sent to that duplicate SIM to carry out unauthorised transactions, often after tricking the victim into revealing personal or identity details by posing as telecom staff. (BE(A)WARE booklet) 7. SIM swap / SIM cloning"
+S3,openai/gpt-oss-120b,True,0.8,503,"SIM swap fraud is a scheme in which fraudsters obtain the victim’s SIM card—or create a duplicate (including an e‑SIM)—for the mobile number that is linked to the customer’s bank account. Once they control that number, they intercept the one‑time passwords (OTPs) sent to the phone and use those OTPs to carry out unauthorised banking transactions, often after first gathering the victim’s personal or identity details by posing as a telecom representative. (BE(A)WARE booklet 7. SIM swap / SIM cloning)"
+S5,openai/gpt-oss-20b,True,0.63,285,"A money mule is an innocent victim who is tricked by fraudsters into receiving stolen or illegal money into their own bank account and then forwarding that money to other accounts, thereby helping to launder the funds (RBI fraud awareness material: BE(A)WARE booklet, 14. Money mules)."
+S5,openai/gpt-oss-120b,True,0.67,220,A money mule is an unwitting victim who is tricked by fraudsters into receiving and then moving stolen or illegal money through their own bank account(s) as part of a laundering chain. (BE(A)WARE booklet 14. Money mules)
+L1,openai/gpt-oss-20b,True,0.58,78,No recent UPI fraud cases are mentioned in the provided context. (Recent news)
+L1,openai/gpt-oss-120b,True,0.61,195,"The provided context does not mention any recent UPI fraud cases in India. (Recent news: “UPI MDR vs debit, credit cards: How much merchants pay on Rs 5,000 to Rs 50,000” – no reference to fraud)"
+L3,openai/gpt-oss-20b,True,0.78,554,"Recent cyber‑fraud incidents in Mumbai include:
+
+- A 36‑year‑old MP was arrested for duping about 9,600 people out of ₹150 crore using fake APK files (2026‑10‑06).  
+- Two individuals were arrested after cyber‑fraudsters used stolen credit‑card funds to purchase mobile phones (2026‑10‑06).  
+- The Mumbai Crime Branch detained a 36‑year‑old BTech dropout who had created 2,805 malicious APKs linked to a ₹15.75‑crore cyber‑fraud scheme (2026‑10‑05).  
+- A software developer was arrested for creating fake APKs that targeted 1,673 citizens (2026‑10‑05)."
+L3,openai/gpt-oss-120b,True,2.54,1471,"Recent cyber‑fraud activity in Mumbai has led to a series of high‑profile arrests:
+
+* **Mass‑scale APK scam:** A 36‑year‑old man from Maharashtra was arrested for using malicious Android‑app packages (APKs) to defraud more than 9,600 victims of roughly **₹150 crore** (~$18 million) (“Mumbai: 36‑Year‑Old MP Man Arrested For Duping Over 9600 People Of ₹150 Cr Using APK Files”).  
+
+* **Malicious‑APK network:** The Mumbai Crime Branch also detained a 36‑year‑old BTech dropout who distributed **2,805** malicious APKs linked to a **₹15.75‑crore** cyber‑fraud scheme (“Mumbai Crime Branch Arrests 36‑Year‑Old BTech Dropout Over 2,805 Malicious APKs Linked To ₹15.75‑Crore Cyber Fraud”).  
+
+* **Fake‑APK developer:** A software developer was arrested for creating counterfeit APKs that targeted **1,673** citizens, further expanding the city’s APK‑related fraud landscape (“Mumbai Cyber Fraud: Software Developer Arrested For Creating Fake APKs Used To Target 1,673 Citizens”).  
+
+* **Stolen‑card phone purchases:** Two suspects were taken into custody after investigators found they had used stolen credit‑card funds to purchase mobile phones, a scheme that also fell under the broader cyber‑fraud crackdown (“Cyber Fraudsters Used Stolen Credit Card Funds to Buy Mobile Phones, Two Arrested”).
+
+Together, these cases illustrate a surge in sophisticated, app‑based scams and credit‑card fraud targeting thousands of Mumbai residents and involving multi‑crore rupee losses."
+B1,openai/gpt-oss-20b,True,4.75,877,"A money mule is an innocent person who is tricked by fraudsters into receiving stolen or illegal money into their bank account and then forwarding that money to another account, creating a chain that ultimately helps the fraudsters launder the proceeds (BE(A)WARE booklet).  
+
+Recent cases involving money mules include:  
+* The Reserve Bank of India announced a 60‑day temporary hold on debit cards linked to money‑mule and cyber‑fraud accounts (2026‑09‑11) (RBI proposes 60‑day temporary debit holds).  
+* Police in Kasaragod booked 26 individuals for renting out their bank accounts and being involved in cybercrime (2026‑09‑09) (Rent out your bank account, land in a cybercrime case).  
+* In Indore, investigators cracked a ₹3.42 crore cyber money trail and detained 16 people for supplying mule bank accounts (2026‑09‑09) (₹3.42 Crore Cyber Money Trail Cracked In Indore)."
+B1,openai/gpt-oss-120b,True,1.2,1147,"A **money mule** is an unwitting person who is persuaded by fraudsters—often through email, social media or other contacts—to receive stolen or illegal funds into his or her own bank account and then forward the money to another account, creating a chain that helps launder the proceeds (BE(A)WARE booklet, “Money mules”).  
+
+**Recent cases reported in the news**
+
+* **RBI’s new safeguard** – On 11 September 2026 the Reserve Bank of India announced a proposal to place a 60‑day temporary debit hold on accounts identified as being used for money‑mule or other cyber‑fraud activities (RBI press release, 2026‑09‑11).  
+* **Kasaragod police operation** – On 9 September 2026 police in Kasaragod booked 26 individuals for “renting out” their bank accounts to cyber‑criminals, effectively acting as money mules (news, 2026‑09‑09).  
+* **Indore money‑trail bust** – On 9 September 2026 investigators in Indore cracked a ₹3.42 crore cyber‑money trail and arrested 16 people for supplying mule bank accounts used in the fraud (news, 2026‑09‑09).  
+
+These examples illustrate how money‑mule schemes continue to surface and how authorities are responding."
+B3,openai/gpt-oss-20b,True,3.29,1269,"**UPI fraud – how it works**  
+Fraudsters pose as buyers on online sales platforms. They express interest in a seller’s product and then use the “request money” feature of a UPI app. The fraudster asks the seller to approve the request by entering their UPI PIN. Once the seller does so, the money is transferred directly to the fraudster’s account, leaving the seller with a loss (RBI BE(A)WARE booklet, 3. Frauds using online sales platforms) (BE(A)WARE booklet).
+
+**Recent incidents and regulatory updates**  
+* **Merchant Discount Rate (MDR) rules** – The Punjab & Sind Bank MD announced that merchants cannot pass the MDR onto consumers; retail customers must pay only the posted price (MDR cannot be passed on to consumers; retail customers to pay only posted price) (2026‑10‑06T14:04:40Z).  
+* **UPI MDR vs debit/credit cards** – A recent article highlighted how much merchants pay in MDR for UPI transactions ranging from ₹5,000 to ₹50,000, underscoring the cost implications for businesses that rely on UPI (UPI MDR vs debit, credit cards: How much merchants pay on Rs 5,000 to Rs 50,000) (2026‑10‑06T13:17:36Z).  
+
+These developments illustrate the growing scrutiny of UPI‑related fees and the need for sellers to be vigilant against the “request money” scam."
+B3,openai/gpt-oss-120b,False,1.79,1781,"**What UPI fraud looks like**
+
+- Fraudsters pose as genuine buyers on online‑sales platforms and express interest in a seller’s product.  
+- Instead of paying through the normal checkout flow, they use the **“request money”** feature in a UPI app and tell the seller to approve the request by entering their UPI PIN.  
+- When the seller enters the PIN, the money is transferred to the fraudster’s account, and the seller loses both the product and the funds.  
+- The fraudsters often claim to be defence personnel posted in remote locations to gain the seller’s trust before asking for the PIN‑based payment. (BE(A)WARE booklet 3. Frauds using online sales platforms)
+
+**Recent related incidents**
+
+- While no specific new UPI‑fraud cases are listed in the provided material, recent news items have focused on the **costs and fees (MDR) associated with UPI transactions** for merchants. One article details how much merchants pay in MDR when processing UPI payments of ₹5,000‑₹50,000, highlighting the financial impact of UPI usage on businesses. (UPI MDR vs debit, credit cards: How much merchants pay on Rs 5,000 to Rs 50,000)
+
+- Another recent statement from Punjab & Sind Bank’s MD reiterates that **MDR cannot be passed on to consumers**, meaning retailers must absorb these fees and cannot shift the cost to buyers. This regulatory reminder underscores the importance of transparent pricing in UPI transactions, even as fraud risks persist. (MDR cannot be passed on to consumers; retail customers to pay only posted price)
+
+Together, the RBI’s awareness material explains the **mechanics of UPI‑based fraud**, while the latest news highlights the **financial environment (MDR) surrounding UPI transactions**, which merchants must navigate alongside fraud‑prevention measures."
+T1,openai/gpt-oss-20b,True,7.66,528,"Voice vishing is a type of phone‑based scam in which imposters call or approach customers, posing as bankers, company executives, insurance agents, government officials, or other trusted figures. They often share a few personal details (such as the customer’s name or date of birth) to build credibility, then pressure or trick the victim into revealing confidential information such as passwords, OTPs, PINs, or card verification values (CVV) by citing an urgency. (RBI fraud awareness material: “Vishing calls Modus Operandi”)"
+T1,openai/gpt-oss-120b,False,0.77,630,"Voice “vising” (more commonly called **vishing**) is a type of voice‑phishing fraud in which fraudsters call or contact customers by telephone (or sometimes via social‑media voice messages) while pretending to be bank officials, company executives, insurance agents, government officers, etc. They often begin the call by mentioning a few personal details (such as the customer’s name or date of birth) to gain the victim’s confidence, and then pressure or trick the person into revealing confidential information—such as passwords, OTPs, PINs, or CVV numbers—by creating a sense of urgency ([BE(A)WARE booklet] 2. Vishing calls)."

@@ -1,0 +1,11 @@
+id,question,section_distance,fixed_distance,winner
+S1,What is phishing?,0.44776827096939087,0.4925631880760193,section
+S2,What is vishing?,0.8072147369384766,0.6332527995109558,fixed
+S3,What is SIM swap fraud?,0.3893846273422241,0.3718801736831665,fixed
+S4,How does ATM card skimming work?,0.4081469178199768,0.38256198167800903,fixed
+S5,What is a money mule?,0.2856820821762085,0.2697746753692627,fixed
+S6,What is juice jacking?,0.4132826328277588,0.5204346179962158,section
+S7,What should I do after falling for a fraud?,0.5711381435394287,0.5225391387939453,fixed
+S8,How can I keep my OTP safe?,0.5582632422447205,0.5584956407546997,section
+S9,What is a fake loan app scam?,0.3409806489944458,0.29214298725128174,fixed
+S10,What is a Ponzi scheme?,0.4411827325820923,0.4147757291793823,fixed
