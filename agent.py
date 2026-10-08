@@ -250,7 +250,7 @@ def build_context(state, include_memory=True):
     if kb_results:
         context += "From RBI fraud awareness material:\n"
         for doc, meta in kb_results:
-            context += f"- [{meta['source']}] {doc[:500]}\n"
+            context += f"- [{meta['source']}] {doc[:800]}\n"
     if news_results:
         context += "\nRecent news:\n"
         for title, date, url in news_results:

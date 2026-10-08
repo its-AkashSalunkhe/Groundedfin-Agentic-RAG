@@ -7,24 +7,50 @@ from pypdf import PdfReader
 import chromadb
 from chromadb.utils import embedding_functions
 
+PART_C_HEADERS = [
+    "General precautions",
+    "For device / computer security",
+    "For safe internet browsing",
+    "For safe internet banking",
+    "Factors indicating that a phone is being spied",
+    "Actions to be taken after occurrence of a fraud",
+    "Precautions related to Debit / Credit cards",
+    "For E-mail account security",
+    "For password security",
+    "How do you know whether an NBFC accepting deposit is genuine or not?",
+    "Precautions to be taken by depositors",
+    "File a complaint",
+]
+
 def chunk_booklet(pdf_path):
     reader = PdfReader(pdf_path)
     full_text = ""
     for page in reader.pages:
         full_text += page.extract_text() + "\n"
 
-    # split on numbered section headers like "1. Phishing links"
-    pattern = re.compile(r'\n\s*(\d{1,2})\.\s+([A-Z][^\n]+)')
-    matches = list(pattern.finditer(full_text))
+    numbered_pattern = re.compile(r'\n\s*(\d{1,2})\.\s+([A-Z][^\n]+)')
+    numbered_matches = list(numbered_pattern.finditer(full_text))
+    boundaries = [(m.start(), m.group(2).strip()) for m in numbered_matches]
+
+    # Part C headers aren't numbered, so we search for them by plain text --
+    # but only AFTER the last numbered section, so we never accidentally match
+    # an earlier mention of the same words sitting in the Table of Contents
+    search_from = numbered_matches[-1].start() if numbered_matches else 0
+    for header in PART_C_HEADERS:
+        idx = full_text.find(header, search_from)
+        if idx != -1:
+            boundaries.append((idx, header))
+
+    boundaries.sort(key=lambda b: b[0])
+
     chunks = []
-    for i, m in enumerate(matches):
-        start = m.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(full_text)
-        title = m.group(2).strip()
+    for i, (start, title) in enumerate(boundaries):
+        end = boundaries[i + 1][0] if i + 1 < len(boundaries) else len(full_text)
         body = full_text[start:end].strip()
-        if len(body) > 80:  # skip stray table-of-contents matches
+        if len(body) > 80:
             chunks.append({"title": title, "text": body, "source": "BE(A)WARE booklet"})
     return chunks
+
 
 def chunk_press_releases(folder):
     chunks = []
@@ -37,8 +63,11 @@ def chunk_press_releases(folder):
     return chunks
 
 if __name__ == "__main__":
-    booklet_chunks = chunk_booklet("data/rbi_docs/BEAWARE_booklet.pdf")
-    pr_chunks = chunk_press_releases("data/rbi_docs/press_releases")
+    booklet_path = r"data/rbi_docs/BEAWARE_booklet.pdf"
+    pr_folder = r"data/rbi_docs/press_releases"
+    
+    booklet_chunks = chunk_booklet(booklet_path)
+    pr_chunks = chunk_press_releases(pr_folder)
     all_chunks = booklet_chunks + pr_chunks
     print(f"total chunks: {len(all_chunks)}")
     for c in all_chunks[:3]:
