@@ -81,7 +81,6 @@ propcache==0.5.4
 protobuf==7.36.2
 pyarrow==25.0.1
 pybase64==1.5.0
-pydantic==2.13.5
 pydantic-settings==2.15.0
 pydantic_core==2.46.5
 pydeck==0.9.3
