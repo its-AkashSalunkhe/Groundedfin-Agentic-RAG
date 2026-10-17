@@ -9,3 +9,4 @@ python-dotenv
 requests
 pypdf
 torch<=2.13.0
+spaces
